@@ -688,30 +688,49 @@ class Table:
             for name, direction in order_by
         ]
 
-    @staticmethod
-    def _pick_linked_map(record_list: RawRecordList) -> Optional[Dict[str, Dict[str, str]]]:
-        return getattr(record_list, "linked_record_summaries", None)
-
     def _enrich_records(self, record_list: RawRecordList) -> RecordsPage:
         att_to_name = {c.id: c.name for c in self.columns()}
-        linked_map = self._pick_linked_map(record_list) or {}
+        # Support both spellings from backend and normalize keys to str
+        raw_linked = (
+            getattr(record_list, "linked_record_summaries", None)
+            or getattr(record_list, "linked_record_smmaries", None)  # legacy misspelling
+            or {}
+        )
+        linked_map: Dict[str, Dict[str, str]] = {str(k): v for k, v in raw_linked.items()}  # row-id -> {attnum: summary}
+
+        # Determine the primary key attnum (use first PK if composite), if present
+        pk_attnum: Optional[int] = None
+        for col in self.columns():
+            if col.primary_key:
+                pk_attnum = col.id
+                break
+
         enriched: List[Dict[str, Any]] = []
-        for idx, rec in enumerate(record_list.results):
+        for rec in record_list.results:
             row: Dict[str, Any] = {}
+            # Resolve the identifier to index linked summaries per row
+            pk_value: Optional[Any] = None
+            if pk_attnum is not None:
+                # keys in results may be strings, so try both
+                pk_value = rec.get(str(pk_attnum))
+                if pk_value is None:
+                    pk_value = rec.get(pk_attnum)  # type: ignore[index]
+
             # keys may be string attnums; normalize to ints when possible
             for k, v in rec.items():
                 try:
                     att = int(k)
-                except Exception:
+                except (ValueError, TypeError):
                     # unexpected key, keep as-is
                     row[k] = v
                     continue
                 colname = att_to_name.get(att, str(att))
                 # If we have linked summary for this row and column, wrap it
-                row_linked = linked_map.get(str(idx)) or linked_map.get(idx) or {}
-                summary = row_linked.get(str(att))
-                if summary is not None and v is not None:
-                    row[colname] = LinkedRecordRef(key=v, summary=summary)
+                linked_records = linked_map.get(str(att), {})
+                linked_summary = linked_records.get(str(pk_value), None) if pk_value is not None else None
+                if linked_records and v is not None:
+                    # Return plain dict with id and summary for linked columns
+                    row[colname] = {"id": v, "summary": linked_summary}
                 else:
                     row[colname] = v
             enriched.append(row)

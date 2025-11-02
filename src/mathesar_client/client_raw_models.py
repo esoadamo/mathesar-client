@@ -924,15 +924,18 @@ class TableInfo(BaseModel):
     Attributes:
         oid: Table OID.
         name: Table name.
-        schema: Schema OID containing this table.
+        schema_oid: Schema OID containing this table. Alias of 'schema' from the API.
         description: Optional table description.
         owner_oid: OID of the table owner role.
         current_role_priv: Privileges the current role has on this table.
         current_role_owns: Whether the current role owns this table.
     """
+    # Allow population by field name when aliases are used
+    model_config = {"populate_by_name": True}
+
     oid: int
     name: str
-    schema: int
+    schema_oid: int = Field(alias="schema")
     description: Optional[str] = None
     owner_oid: int
     current_role_priv: List[Literal['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']]
