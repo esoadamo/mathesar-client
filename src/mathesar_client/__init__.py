@@ -1,4 +1,5 @@
 from .client_raw import MathesarClientRaw, MathesarClientError
+from .client import MathesarClient
 from .client_raw_models import (
 	# Records
 	OrderBy,
@@ -81,6 +82,7 @@ __all__ = [
 	# Client
 	"MathesarClientRaw",
 	"MathesarClientError",
+	"MathesarClient",
 	# Records
 	"OrderBy",
 	"Filter",

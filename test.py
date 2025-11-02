@@ -1,9 +1,9 @@
-from src.mathesar_client.client_raw import MathesarClientRaw
+from src.mathesar_client import MathesarClient
 
 
 if __name__ == "__main__":
     def _test():
-        client = MathesarClientRaw()
-        print(client.records_list(database_id=2, table_id=18087))
+        client = MathesarClient()
+        print(client.database(database_id=2).table(table_oid=18087).records_list())
 
     _test()

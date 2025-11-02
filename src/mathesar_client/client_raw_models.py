@@ -64,7 +64,7 @@ class RecordList(BaseModel):
     count: int
     results: List[RecordObject]
     grouping: Optional[GroupingResponse] = None
-    linked_record_smmaries: Optional[Dict[str, Any]] = None
+    linked_record_summaries: Optional[Dict[str, Dict[str, str]]] = None
     record_summaries: Optional[Dict[str, str]] = None
     download_links: Optional[Dict[str, Any]] = None
 

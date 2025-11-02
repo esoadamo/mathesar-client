@@ -3096,7 +3096,7 @@ Attributes:
 * Name: grouping
   * Type:                   GroupingResponse            
   * Description:               Information for displaying grouped records.            
-* Name: linked_record_smmaries
+* Name: linked_record_summaries
   * Type:                   GroupingResponse            
   * Description:               Information for previewing foreign keyvalues, provides a map of foreign key to a text summary.            
 * Name: record_summaries
