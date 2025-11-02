@@ -28,9 +28,10 @@ jobs:
           pip install setuptools wheel twine build uv
       - name: Run tests
         run: |
-          uv sync
+          uv export --no-hashes --format requirements-txt > requirements.txt
+          pip install -r requirements.txt
       - name: Build and publish
         run: |
-          uv run python -m build
+          python -m build
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
