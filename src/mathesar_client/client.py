@@ -13,6 +13,8 @@ Features:
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Literal
+from datetime import datetime
+import json
 from pydantic import BaseModel
 
 from .client_raw import MathesarClientRaw
@@ -689,7 +691,9 @@ class Table:
         ]
 
     def _enrich_records(self, record_list: RawRecordList) -> RecordsPage:
-        att_to_name = {c.id: c.name for c in self.columns()}
+        cols = self.columns()
+        att_to_name = {c.id: c.name for c in cols}
+        att_to_type = {c.id: (c.type or "").lower() for c in cols}
         # Support both spellings from backend and normalize keys to str
         raw_linked = (
             getattr(record_list, "linked_record_summaries", None)
@@ -732,6 +736,39 @@ class Table:
                     # Return plain dict with id and summary for linked columns
                     row[colname] = {"id": v, "summary": linked_summary}
                 else:
+                    # Optionally convert JSON and date/datetime-like strings into Python objects
+                    if isinstance(v, str):
+                        col_type = att_to_type.get(att, "")
+                        # Parse JSON first if column type is JSON/JSONB
+                        if "json" in col_type:
+                            try:
+                                row[colname] = json.loads(v)
+                                continue
+                            except Exception:
+                                pass
+                        if "date" in col_type or "timestamp" in col_type or "datetime" in col_type:
+                            s = v.strip()
+                            # Drop historical suffixes like ' AD'/' BC' if present
+                            if s.endswith(" AD"):
+                                s = s[:-3].strip()
+                            if s.endswith(" BC"):
+                                s = s[:-3].strip()
+                            # Replace trailing 'Z' with +00:00 for fromisoformat
+                            if s.endswith("Z"):
+                                s = s[:-1] + "+00:00"
+                            parsed: Optional[datetime] = None
+                            try:
+                                parsed = datetime.fromisoformat(s)
+                            except Exception:
+                                # Fallbacks for plain dates
+                                try:
+                                    if len(s) == 10 and s[4] == "-" and s[7] == "-":
+                                        parsed = datetime.strptime(s, "%Y-%m-%d")
+                                except Exception:
+                                    parsed = None
+                            if parsed is not None:
+                                row[colname] = parsed
+                                continue
                     row[colname] = v
             enriched.append(row)
         return RecordsPage(count=record_list.count, results=enriched)
