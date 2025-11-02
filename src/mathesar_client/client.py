@@ -1,3 +1,15 @@
+"""High-level ergonomic client for Mathesar API.
+
+This module provides a user-friendly client with a hierarchical structure:
+MathesarClient → Database → Schema → Table
+
+Features:
+- Column name resolution (use names instead of attnums)
+- Linked record summary inlining
+- Name-based lookups for schemas and tables
+- Convenience methods for common operations
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Literal
@@ -63,40 +75,92 @@ from .client_raw_models import (
 
 
 class LinkedRecordRef(SummarizedRecordReference):
+    """A reference to a linked record enriched with summary text.
+    
+    Used in record results to represent foreign key relationships
+    with both the key value and a human-readable summary.
+    """
     pass
 
 
 class RecordsPage(BaseModel):
+    """A page of records from a query with enriched column names.
+    
+    Attributes:
+        count: Total number of records matching the query.
+        results: List of record dictionaries with column names as keys.
+    """
     count: int
     results: List[Dict[str, Any]]
 
 
 class MathesarClient:
-    """A higher-level, ergonomic client built on top of MathesarClientRaw.
-
-    Entry point: client.database(<database_id>).schema(<schema_oid>).table(<table_oid>)
+    """High-level ergonomic client for Mathesar API.
+    
+    This client provides a user-friendly interface with:
+    - Hierarchical navigation: database() → schema() → table()
+    - Column name resolution (use names instead of attnums)
+    - Linked record summary inlining
+    - Name-based lookups
+    - Convenience methods for common operations
+    
+    Args:
+        raw: Optional MathesarClientRaw instance. If not provided, creates one using
+             environment variables (MATHESAR_BASE_URL, MATHESAR_USERNAME, MATHESAR_PASSWORD).
+    
+    Example:
+        >>> client = MathesarClient()
+        >>> db = client.database(1)
+        >>> schema = db.schema_by_name("public")
+        >>> table = schema.table_by_name("users")
+        >>> records = table.records_list(limit=10)
     """
 
     def __init__(self, raw: Optional[MathesarClientRaw] = None):
         self.raw = raw or MathesarClientRaw()
 
     def database(self, database_id: int) -> Database:
+        """Get a Database object for the specified database.
+        
+        Args:
+            database_id: Database ID to work with.
+        
+        Returns:
+            Database instance for performing database-level operations.
+        """
         return Database(self.raw, database_id)
 
     # ----- Analytics -----
     def analytics_get_state(self) -> AnalyticsState:
+        """Get the current analytics collection state.
+        
+        Returns:
+            AnalyticsState indicating whether analytics are enabled.
+        """
         return self.raw.analytics_get_state()
 
     def analytics_initialize(self) -> None:
+        """Initialize and enable analytics collection."""
         return self.raw.analytics_initialize()
 
     def analytics_disable(self) -> None:
+        """Disable analytics collection."""
         return self.raw.analytics_disable()
 
     def analytics_view_report(self) -> AnalyticsReport:
+        """View the current analytics report.
+        
+        Returns:
+            AnalyticsReport with usage statistics.
+        """
         return self.raw.analytics_view_report()
 
     def analytics_upload_feedback(self, *, message: str) -> None:
+        """Upload user feedback to analytics.
+        
+        Args:
+            message: Feedback message to upload.
+        """
         return self.raw.analytics_upload_feedback(message=message)
 
     # ----- Setup (global) -----
@@ -212,6 +276,24 @@ class MathesarClient:
 
 
 class Database:
+    """Database-level operations and navigation.
+    
+    Provides access to:
+    - Schema management and navigation
+    - Database-level privileges
+    - Explorations, collaborators, and roles
+    - Database information and upgrades
+    
+    Args:
+        raw: The underlying raw client.
+        database_id: Database ID for this instance.
+    
+    Example:
+        >>> db = client.database(1)
+        >>> schemas = db.list_schemas()
+        >>> schema = db.schema_by_name("public")
+    """
+    
     def __init__(self, raw: MathesarClientRaw, database_id: int):
         self._raw = raw
         self.database_id = database_id
@@ -242,9 +324,28 @@ class Database:
         return self._raw.schemas_patch(schema_oid=schema_oid, database_id=self.database_id, patch=patch)
 
     def schema(self, schema_oid: int) -> Schema:
+        """Get a Schema object for the specified schema.
+        
+        Args:
+            schema_oid: Schema OID to work with.
+        
+        Returns:
+            Schema instance for performing schema-level operations.
+        """
         return Schema(self._raw, self.database_id, schema_oid)
 
     def schema_by_name(self, name: str) -> Schema:
+        """Get a Schema object by name.
+        
+        Args:
+            name: Schema name to look up.
+        
+        Returns:
+            Schema instance for the named schema.
+        
+        Raises:
+            ValueError: If no schema with the given name exists.
+        """
         schemas = self._raw.schemas_list(database_id=self.database_id)
         for s in schemas:
             if s.name == name:
@@ -342,6 +443,24 @@ class Database:
 
 
 class Schema:
+    """Schema-level operations and navigation.
+    
+    Provides access to:
+    - Table management and navigation
+    - Forms management
+    - Data modeling operations (mapping tables)
+    
+    Args:
+        raw: The underlying raw client.
+        database_id: Database ID this schema belongs to.
+        schema_oid: Schema OID for this instance.
+    
+    Example:
+        >>> schema = db.schema_by_name("public")
+        >>> tables = schema.list_tables()
+        >>> table = schema.table_by_name("users")
+    """
+    
     def __init__(self, raw: MathesarClientRaw, database_id: int, schema_oid: int):
         self._raw = raw
         self.database_id = database_id
@@ -379,9 +498,28 @@ class Schema:
         )
 
     def table(self, table_oid: int) -> Table:
+        """Get a Table object for the specified table.
+        
+        Args:
+            table_oid: Table OID to work with.
+        
+        Returns:
+            Table instance for performing table-level operations.
+        """
         return Table(self._raw, self.database_id, table_oid)
 
     def table_by_name(self, name: str) -> Table:
+        """Get a Table object by name.
+        
+        Args:
+            name: Table name to look up.
+        
+        Returns:
+            Table instance for the named table.
+        
+        Raises:
+            ValueError: If no table with the given name exists.
+        """
         tables = self.list_tables()
         for t in tables:
             if t.name == name:
@@ -460,6 +598,37 @@ class Schema:
 
 
 class Table:
+    """Table-level operations with column name resolution and record enrichment.
+    
+    Provides:
+    - Record operations with column names (instead of attnums)
+    - Linked record summary inlining
+    - Column management with name-based API
+    - Constraint and data modeling operations
+    - Table metadata and privileges
+    
+    This class automatically caches column information and provides mappings
+    between column names and attribute numbers (attnums).
+    
+    Args:
+        raw: The underlying raw client.
+        database_id: Database ID this table belongs to.
+        table_oid: Table OID for this instance.
+    
+    Example:
+        >>> table = schema.table_by_name("users")
+        >>> # Query records using column names
+        >>> page = table.records_list(
+        ...     limit=10,
+        ...     order_by=[("created_at", "desc")]
+        ... )
+        >>> # Add a record using column names
+        >>> record = table.record_add({
+        ...     "email": "user@example.com",
+        ...     "full_name": "John Doe"
+        ... })
+    """
+    
     def __init__(self, raw: MathesarClientRaw, database_id: int, table_oid: int):
         self._raw = raw
         self.database_id = database_id
@@ -470,6 +639,14 @@ class Table:
 
     # ----- Columns helpers -----
     def columns(self, use_cache: bool = True) -> List[ColumnInfo]:
+        """Get list of columns for this table.
+        
+        Args:
+            use_cache: Whether to use cached column information.
+        
+        Returns:
+            List of ColumnInfo objects.
+        """
         if not use_cache or self._columns_cache is None:
             self._columns_cache = self._raw.columns_list(table_oid=self.table_oid, database_id=self.database_id)
             self._attnum_to_name = {c.id: c.name for c in self._columns_cache}
@@ -477,6 +654,7 @@ class Table:
         return self._columns_cache
 
     def _ensure_column_maps(self):
+        """Ensure column name/attnum mappings are loaded."""
         if self._attnum_to_name is None or self._name_to_attnum is None:
             self.columns(use_cache=False)
 
@@ -548,6 +726,29 @@ class Table:
         order_by: Optional[List[Tuple[str, Literal["asc", "desc"]]]] = None,
         return_record_summaries: bool = True,
     ) -> RecordsPage:
+        """List records from this table with enriched column names.
+        
+        This method returns records with column names as keys (instead of attnums)
+        and inlines linked record summaries when requested.
+        
+        Args:
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            order_by: List of (column_name, direction) tuples for sorting.
+                     Example: [("created_at", "desc"), ("name", "asc")]
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            RecordsPage with count and enriched results.
+        
+        Example:
+            >>> page = table.records_list(
+            ...     limit=10,
+            ...     order_by=[("created_at", "desc")]
+            ... )
+            >>> for record in page.results:
+            ...     print(record["email"], record["full_name"])
+        """
         order = self._order_by_from_names(order_by)
         raw = self._raw.records_list(
             database_id=self.database_id,
@@ -567,6 +768,17 @@ class Table:
         offset: int = 0,
         return_record_summaries: bool = True,
     ) -> RecordsPage:
+        """Search records in this table.
+        
+        Args:
+            search_params: List of SearchParam for full-text search.
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            RecordsPage with matching records.
+        """
         raw = self._raw.records_search(
             database_id=self.database_id,
             table_id=self.table_oid,
@@ -578,6 +790,18 @@ class Table:
         return self._enrich_records(raw)
 
     def record_get(self, *, record_id: Any, return_record_summaries: bool = True) -> Dict[str, Any]:
+        """Get a single record by ID.
+        
+        Args:
+            record_id: Primary key value of the record.
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            Record dictionary with column names as keys.
+        
+        Raises:
+            ValueError: If record is not found.
+        """
         raw = self._raw.records_get(
             database_id=self.database_id,
             table_id=self.table_oid,
@@ -590,6 +814,22 @@ class Table:
         return page.results[0]
 
     def record_add(self, *, record_def_by_name: Dict[str, Any], return_record_summaries: bool = True) -> Dict[str, Any]:
+        """Add a new record to the table.
+        
+        Args:
+            record_def_by_name: Dictionary mapping column names to values.
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            The added record as a dictionary with column names as keys.
+        
+        Example:
+            >>> record = table.record_add({
+            ...     "email": "user@example.com",
+            ...     "full_name": "Jane Doe",
+            ...     "active": True
+            ... })
+        """
         # Convert column names to attnums
         self._ensure_column_maps()
         record_def: Dict[str, Any] = {
@@ -613,6 +853,22 @@ class Table:
         record_def_by_name: Dict[str, Any],
         return_record_summaries: bool = True,
     ) -> Dict[str, Any]:
+        """Update an existing record.
+        
+        Args:
+            record_id: Primary key value of the record to update.
+            record_def_by_name: Dictionary mapping column names to new values.
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            The updated record as a dictionary with column names as keys.
+        
+        Example:
+            >>> updated = table.record_patch(
+            ...     record_id=123,
+            ...     record_def_by_name={"active": False}
+            ... )
+        """
         self._ensure_column_maps()
         record_def: Dict[str, Any] = {
             str(self._colname_to_attnum(k)): v for k, v in record_def_by_name.items()

@@ -1,3 +1,9 @@
+"""Low-level raw JSON-RPC client for Mathesar API.
+
+This module provides direct 1:1 mapping to Mathesar API methods with typed
+parameters and return values using Pydantic models for validation.
+"""
+
 from typing import Any, Dict, List, Optional, Literal
 from requests import post
 from os import environ
@@ -68,10 +74,30 @@ from .client_raw_models import (
 
 
 class MathesarClientError(Exception):
+    """Exception raised when a Mathesar API call returns an error."""
     pass
 
 
 class MathesarClientRaw:
+    """Low-level JSON-RPC client for Mathesar API.
+    
+    This client provides direct access to all Mathesar API methods with typed
+    parameters and validated responses using Pydantic models.
+    
+    Args:
+        base_url: Base URL of the Mathesar instance. Falls back to MATHESAR_BASE_URL env var.
+        username: Username for basic auth. Falls back to MATHESAR_USERNAME env var.
+        password: Password for basic auth. Falls back to MATHESAR_PASSWORD env var.
+    
+    Example:
+        >>> client = MathesarClientRaw(
+        ...     base_url="https://mathesar.example.com",
+        ...     username="admin",
+        ...     password="secret"
+        ... )
+        >>> records = client.records_list(database_id=1, table_id=123)
+    """
+    
     def __init__(self, base_url: Optional[str] = None, username: Optional[str] = None, password: Optional[str] = None):
         self.__base_url = base_url or environ['MATHESAR_BASE_URL']
         self.__username = username or environ['MATHESAR_USERNAME']
@@ -90,6 +116,21 @@ class MathesarClientRaw:
         grouping: Optional[Grouping] = None,
         return_record_summaries: bool = False,
     ) -> RecordList:
+        """List records from a table with optional filtering, sorting, and grouping.
+        
+        Args:
+            database_id: Database ID containing the table.
+            table_id: Table OID to query.
+            limit: Maximum number of records to return.
+            offset: Number of records to skip.
+            order: List of OrderBy specifications for sorting.
+            filter: Filter specification for filtering records.
+            grouping: Grouping specification for aggregating records.
+            return_record_summaries: Whether to include summaries of linked records.
+        
+        Returns:
+            RecordList containing the query results and metadata.
+        """
         data: Dict[str, Any] = {
             "database_id": database_id,
             "table_oid": table_id,
